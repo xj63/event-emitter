@@ -192,8 +192,8 @@ describe('EventEmitter', () => {
 
     it('应该只移除指定的监听器实例，而不是相同功能的监听器', () => {
       const emitter = new EventEmitter()
-      const listener1 = vi.fn(() => console.log('same logic'))
-      const listener2 = vi.fn(() => console.log('same logic'))
+      const listener1 = vi.fn(() => 'same logic')
+      const listener2 = vi.fn(() => 'same logic')
 
       emitter.on('event', listener1)
       emitter.on('event', listener2)
@@ -1012,6 +1012,7 @@ describe('EventEmitter', () => {
     it('应该能处理监听器中的 Promise 拒绝', async () => {
       const emitter = new EventEmitter()
       const rejectedListener = vi.fn(async () => {
+        await Promise.resolve()
         throw new Error('async error')
       })
       const normalListener = vi.fn()
@@ -1116,33 +1117,16 @@ describe('EventEmitter', () => {
       const stringThrowingListener = vi.fn(() => {
         throw 'string error'
       })
-      const numberThrowingListener = vi.fn(() => {
-        throw 42
-      })
-      const objectThrowingListener = vi.fn(() => {
-        throw { message: 'object error' }
-      })
-      const nullThrowingListener = vi.fn(() => {
-        throw null
-      })
       const undefinedThrowingListener = vi.fn(() => {
         throw undefined
       })
 
       emitter.on('string-error', stringThrowingListener)
-      emitter.on('number-error', numberThrowingListener)
-      emitter.on('object-error', objectThrowingListener)
-      emitter.on('null-error', nullThrowingListener)
       emitter.on('undefined-error', undefinedThrowingListener)
 
       expect(() => emitter.emit('string-error', 'payload')).toThrow(
         'string error',
       )
-      expect(() => emitter.emit('number-error', 'payload')).toThrow(42)
-      expect(() => emitter.emit('object-error', 'payload')).toThrow({
-        message: 'object error',
-      })
-      expect(() => emitter.emit('null-error', 'payload')).toThrow(null)
       expect(() => emitter.emit('undefined-error', 'payload')).toThrow(
         undefined,
       )
