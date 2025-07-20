@@ -1,5 +1,13 @@
 type Overwrite<T, K extends PropertyKey, V> = Omit<T, K> & Record<K, V>
 
+type IsUnknown<T> = unknown extends T
+  ? T extends unknown
+    ? [keyof T] extends [never]
+      ? true
+      : false
+    : false
+  : false
+
 /**
  * 使用链式调用自动推断类型的事件发射器。
  *
@@ -261,6 +269,13 @@ export class EventEmitter<E extends Record<PropertyKey, any> = {}> {
    *
    * // 下面的调用会因为类型不匹配而导致 TypeScript 编译错误
    * // emitter.emit('ping', { timestamp: Date.now() }) // 错误: 属性 'source' 缺失
+   *
+   * // 允许注册不需要数据的回调
+   * emitter
+   *   .on('hello', () => {
+   *     console.log('hi')
+   *   })
+   *   .emit('hello') 允许不带参数的 emit
    * ```
    */
   public emit<K extends keyof E>(key: K, event: E[K]): EventEmitter<E>
@@ -268,8 +283,14 @@ export class EventEmitter<E extends Record<PropertyKey, any> = {}> {
     key: K extends keyof E ? never : K,
     event: T,
   ): EventEmitter<Overwrite<E, K, T>>
+  public emit<K extends keyof E>(
+    key: IsUnknown<E[K]> extends true ? K : never,
+  ): EventEmitter<E>
+  public emit<K extends PropertyKey, T>(
+    key: K extends keyof E ? never : K,
+  ): EventEmitter<Overwrite<E, K, T>>
 
-  public emit(key: PropertyKey, event: any): EventEmitter<E> {
+  public emit(key: PropertyKey, event?: any): EventEmitter<E> {
     const listenerList = this.map.get(key) ?? []
     // 使用 slice() 创建一个副本，防止在监听器中修改原始数组（例如通过 .off()）时影响循环
     listenerList.slice().forEach((listener) => listener(event))
