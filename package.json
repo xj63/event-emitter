@@ -1,6 +1,6 @@
 {
   "name": "@xj63/event-emitter",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "packageManager": "bun@1.2.18",
   "description": "🚀 A fast and lightweight event emitter written in TypeScript, with zero dependencies.",
   "type": "module",
