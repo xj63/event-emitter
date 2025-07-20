@@ -4,7 +4,7 @@ type Overwrite<T, K extends PropertyKey, V> = Omit<T, K> & Record<K, V>
  * 一个类型安全的事件发射器。
  *
  * 允许你注册事件监听器并在代码中触发这些事件。
- * 它的核心优势是完全的类型安全，TypeScript 能够推断出事件负载（payload）的类型。
+ * 所有方法均可通过链式调用来自动传递事件的类型信息，使用时可以获得良好的类型补全
  *
  * @template E - 一个对象类型，其中键是事件名称，值是传递给监听器的数据类型。
  * @example
@@ -17,9 +17,14 @@ type Overwrite<T, K extends PropertyKey, V> = Omit<T, K> & Record<K, V>
  *     console.log(`收到了数据: ${data}`)
  *   })
  *
- * // 类型安全地触发事件
+ * // 类型安全地触发事件，此时可以获得事件命的补全，和事件值的数据类型
  * emitter.emit('user:created', { id: 1, name: 'Alice' })
  * emitter.emit('data', 'Hello World')
+ *
+ * // 根据链式调用时注册的信息自动推导出
+ * // user:created 事件的值类型应当为 { id:number, name:string }
+ * // 当这里传入的类型为 number，此时 TypeScript 会静态警告或报错
+ * // emitter.emit('user:created', 123)
  * ```
  */
 export class EventEmitter<E extends Record<PropertyKey, any> = {}> {
@@ -28,7 +33,7 @@ export class EventEmitter<E extends Record<PropertyKey, any> = {}> {
   /**
    * 注册一个事件监听器，该监听器会在指定事件被触发时调用。
    *
-   * 如果为新事件注册监听器，该事件及其负载类型将被添加到 `EventEmitter` 的类型定义中。
+   * 如果为新事件注册监听器，该事件及其负载类型将被添加到返回的 `EventEmitter` 的类型定义中。
    *
    * @template K - 事件的名称。
    * @param key - 事件的名称。
@@ -36,10 +41,8 @@ export class EventEmitter<E extends Record<PropertyKey, any> = {}> {
    * @returns `EventEmitter` 实例，以便进行链式调用。
    * @example
    * ```ts
-   * const emitter = new EventEmitter()
-   *
    * // 定义一个 'message' 事件，负载类型为 string
-   * emitter.on('message', (msg: string) => {
+   * const emitter = new EventEmitter().on('message', (msg: string) => {
    *   console.log(`新消息: ${msg}`)
    * })
    *
@@ -47,12 +50,14 @@ export class EventEmitter<E extends Record<PropertyKey, any> = {}> {
    * emitter.emit('message', '你好，类型安全！')
    * ```
    */
+  // 已存在事件追加同类型事件监听器
   public on<K extends keyof E>(
     key: K,
     listener: (event: E[K]) => void,
   ): EventEmitter<E>
+  // 新增事件类型，如果已经存在事件名，则不会 match
   public on<K extends PropertyKey, T>(
-    key: K,
+    key: K extends keyof E ? never : K,
     listener: (event: T) => void,
   ): EventEmitter<Overwrite<E, K, T>>
 
@@ -77,9 +82,7 @@ export class EventEmitter<E extends Record<PropertyKey, any> = {}> {
    * @returns `EventEmitter` 实例，以便进行链式调用。
    * @example
    * ```ts
-   * const emitter = new EventEmitter()
-   *
-   * emitter.once('one-time', (data: string) => {
+   * const emitter = new EventEmitter().once('one-time', (data: string) => {
    *   console.log(`此消息只会被记录一次: ${data}`)
    * })
    *
@@ -92,7 +95,7 @@ export class EventEmitter<E extends Record<PropertyKey, any> = {}> {
     listener: (event: E[K]) => void,
   ): EventEmitter<E>
   public once<K extends PropertyKey, T>(
-    key: K,
+    key: K extends keyof E ? never : K,
     listener: (event: T) => void,
   ): EventEmitter<Overwrite<E, K, T>>
 
@@ -143,7 +146,10 @@ export class EventEmitter<E extends Record<PropertyKey, any> = {}> {
     key: K,
     listener: (event: E[K]) => void,
   ): EventEmitter<E>
-  public off(key: PropertyKey, listener: (event: any) => void): EventEmitter<E>
+  public off<K extends PropertyKey, T>(
+    key: K extends keyof E ? never : K,
+    listener: (event: T) => void,
+  ): EventEmitter<E>
 
   public off<K extends keyof E>(
     key: K,
@@ -181,7 +187,10 @@ export class EventEmitter<E extends Record<PropertyKey, any> = {}> {
    * ```
    */
   public emit<K extends keyof E>(key: K, event: E[K]): EventEmitter<E>
-  public emit(key: PropertyKey, event: any): EventEmitter<E>
+  public emit<K extends PropertyKey, T>(
+    key: K extends keyof E ? never : K,
+    event: T,
+  ): EventEmitter<Overwrite<E, K, T>>
 
   public emit(key: PropertyKey, event: any): EventEmitter<E> {
     const listenerList = this.map.get(key) ?? []
