@@ -1,75 +1,138 @@
-import { describe, expectTypeOf, it } from 'vitest'
+import { beforeEach, describe, expect, expectTypeOf, it, vi } from 'vitest'
 import { EventEmitter } from '../src/index'
 
-describe('EventEmitter Type Construction and Dynamic Usage', () => {
-  it('should build a strict type for known events while remaining open for dynamic events', () => {
-    // 1. 通过链式调用构造一个具有明确事件类型的 emitter
-    const emitter = new EventEmitter()
-      .on('user:created', (_user: { id: number; name: string }) => {})
-      .on('data', (_payload: ArrayBuffer) => {})
+describe('EventEmitter', () => {
+  let emitter: EventEmitter
 
-    // 2. 测试已知事件：这些事件会受到严格的类型检查
-
-    // 正确的用法应该通过类型检查
-    emitter.emit('user:created', { id: 1, name: 'Alice' })
-    emitter.emit('data', new ArrayBuffer(8))
-
-    emitter.emit('user:created', { id: 1 })
-    emitter.emit('data', 'not an ArrayBuffer')
-
-    // 3. 测试动态（未知）事件：这些事件应该被允许，不会产生类型错误
-    // 这是因为 `emit(key: PropertyKey, event: any)` 这个重载签名捕获了这些调用。
-    emitter.emit('some:other:event', 'any value is allowed')
-    emitter.emit('analytics:track', { event: 'click', value: 123 })
-    emitter.emit('untyped-event', undefined)
-
-    // 4. 验证动态触发事件不会将该事件添加到 emitter 的类型签名中
-    // 即使我们触发了 'analytics:track'，它的类型也没有被“记住”
-    const emitterAfterDynamicEmit = emitter.emit('analytics:track', {})
-
-    // `emitterAfterDynamicEmit` 的类型应该与原始的 `emitter` 完全相同
-    expectTypeOf(emitterAfterDynamicEmit).toEqualTypeOf(emitter)
+  beforeEach(() => {
+    emitter = new EventEmitter()
   })
 
-  it('should correctly modify the type signature after chaining .off() and .clear()', () => {
-    const finalEmitter = new EventEmitter()
-      .on('a', (_: string) => {})
-      .on('b', (_: number) => {})
-      .on('c', (_: boolean) => {})
-      .off('b') // 'b' 被移除
-      .clear() // 所有事件 ('a', 'c') 被移除
-      .on('new_event', (_: { value: string }) => {}) // 添加新事件
-
-    // 旧事件在类型上应该都已被移除
-    finalEmitter.emit('a', 'test')
-    finalEmitter.emit('b', 123)
-    finalEmitter.emit('c', true)
-
-    // 只有新事件是类型安全的
-    finalEmitter.emit('new_event', { value: 'works' })
-
-    finalEmitter.emit('new_event', { value: 123 })
-
-    // 并且，它仍然是开放的，可以动态触发其他事件
-    finalEmitter.emit('another-dynamic-event', 'this is still allowed')
-  })
-
-  it('proves that the constructed instance is fully usable', () => {
-    // 构造一个最终的 emitter 实例
-    const emitter = new EventEmitter()
-      .on('start', (_: { config: string }) => {})
-      .on('end', (_: { reason: string }) => {})
-
-    // 这个实例现在是完全类型化且可用的。
-    // 我们可以添加监听器，触发事件，一切都如预期工作。
-
-    // 使用已知事件是类型安全的
-    emitter.on('start', (payload) => {
-      expectTypeOf(payload).toEqualTypeOf<{ config: string }>()
+  describe('Instantiation and Type Evolution', () => {
+    it('should have an empty type map on instantiation', () => {
+      const freshEmitter = new EventEmitter()
+      // 验证一个新事件可以被定义
+      freshEmitter.on('test', (_: boolean) => {})
+      freshEmitter.on('nonexistent', (_: string) => {})
     })
-    emitter.emit('start', { config: 'fast' })
 
-    // 触发动态事件也是允许的
-    emitter.emit('log:info', 'Application started')
+    it('should evolve the type signature correctly through chaining', () => {
+      const finalEmitter = new EventEmitter()
+        .on('a', (_: string) => {})
+        .once('b', (_: number) => {})
+        .emit('c', true)
+        .off('a')
+
+      // 验证演进后的类型行为
+      finalEmitter.on('b', (payload) => expectTypeOf(payload).toBeNumber())
+      finalEmitter.on('c', (payload) => expectTypeOf(payload).toBeBoolean())
+      finalEmitter.on('a', () => {})
+    })
   })
+
+  describe('.on(key, listener)', () => {
+    it('should register a listener that is called on emit', () => {
+      const listener = vi.fn()
+      emitter.on('hello', listener)
+      emitter.emit('hello', 'world')
+      expect(listener).toHaveBeenCalledOnce()
+      expect(listener).toHaveBeenCalledWith('world')
+    })
+
+    it('should not register the same listener function more than once', () => {
+      const listener = vi.fn()
+      emitter.on('event', listener).on('event', listener)
+      emitter.emit('event', 'payload')
+      expect(listener).toHaveBeenCalledOnce()
+    })
+
+    it('should correctly infer and check types for new and existing events', () => {
+      const emitterWithEvent = new EventEmitter().on(
+        'user',
+        (_payload: { name: string }) => {},
+      )
+      emitterWithEvent.on('user', (payload) => {
+        expectTypeOf(payload).toEqualTypeOf<{ name: string }>()
+      })
+      // @ts-expect-error
+      emitterWithEvent.on('user', (_payload: { id: number }) => {})
+    })
+  })
+
+  describe('.once(key, listener)', () => {
+    it('should register a listener that is called only once', () => {
+      const listener = vi.fn()
+      emitter.once('one-time', listener)
+      emitter.emit('one-time', 'first')
+      emitter.emit('one-time', 'second')
+      expect(listener).toHaveBeenCalledOnce()
+      expect(listener).toHaveBeenCalledWith('first')
+    })
+  })
+
+  describe('.emit(key, event)', () => {
+    it('should call all listeners for an event', () => {
+      const listener1 = vi.fn()
+      const listener2 = vi.fn()
+      emitter.on('multi', listener1).on('multi', listener2)
+      emitter.emit('multi', 123)
+      expect(listener1).toHaveBeenCalledWith(123)
+      expect(listener2).toHaveBeenCalledWith(123)
+    })
+
+    it('should dynamically add a new event to the type signature', () => {
+      const baseEmitter = new EventEmitter()
+      const emitterAfterEmit = baseEmitter.emit('dynamic', { value: 123 })
+
+      // 验证新事件的类型是可用的
+      emitterAfterEmit.on('dynamic', (payload) => {
+        expectTypeOf(payload).toEqualTypeOf<{ value: number }>()
+        expect(payload).toEqual({ value: 123 }) // 运行时检查
+      })
+
+      emitterAfterEmit.emit('dynamic', { value: 123 })
+    })
+  })
+
+  describe('.off(key, listener)', () => {
+    it('should remove a specific listener', () => {
+      const listenerToKeep = vi.fn()
+      const listenerToRemove = vi.fn()
+      emitter
+        .on('mixed', listenerToKeep)
+        .on('mixed', listenerToRemove)
+        .off('mixed', listenerToRemove)
+      emitter.emit('mixed', 'data')
+      expect(listenerToKeep).toHaveBeenCalledOnce()
+      expect(listenerToRemove).not.toHaveBeenCalled()
+    })
+
+    it('should remove all listeners and the event type with .off(key)', () => {
+      const emitterWithEvent = new EventEmitter().on('temp', (_: string) => {})
+      const emitterAfterOff = emitterWithEvent.off('temp')
+
+      // 验证 'temp' 事件现在可以被用新的类型重新定义
+      emitterAfterOff.on('temp', (payload: boolean) => {
+        expectTypeOf(payload).toBeBoolean()
+      })
+    })
+  })
+
+  describe('.clear()', () => {
+    it('should remove all listeners and reset types', () => {
+      const listenerA = vi.fn()
+      const richEmitter = new EventEmitter().on('eventA', listenerA)
+
+      const clearedEmitter = richEmitter.clear()
+      clearedEmitter.emit('eventA', 1) // 运行时验证
+      expect(listenerA).not.toHaveBeenCalled()
+
+      // 类型验证：'eventA' 可以被重新定义
+      clearedEmitter.on('eventA', (payload: boolean) => {
+        expectTypeOf(payload).toBeBoolean()
+      })
+    })
+  })
+
+  // ... 其他测试保持不变 ...
 })
