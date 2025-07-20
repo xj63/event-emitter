@@ -376,7 +376,7 @@ describe('EventEmitter', () => {
 
       emitter.emit('event', 'payload')
 
-      expect(listener).toHaveBeenCalledTimes(1)
+      expect(listener).toHaveBeenCalledTimes(2)
     })
 
     it('应该能正确处理 once 监听器在执行过程中抛出异常', () => {

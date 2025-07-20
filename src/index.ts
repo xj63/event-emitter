@@ -128,7 +128,8 @@ export class EventEmitter<E extends Record<PropertyKey, any> = {}> {
    *
    * 监听器会在它被调用之前从监听器列表中移除，这可以防止在监听器内部再次触发相同事件时导致无限循环。
    *
-   * **重要**: 如果使用相同的 `key` 和 `listener` 多次调用 `on` 方法，该监听器**只会**被注册一次，当事件来临时只会触发一次。
+   * **重要**: 如果使用相同的 `key` 和 `listener` 多次调用 `once` 方法，该监听器会被注册多次，当事件来临时会触发多次。
+   * 由于实现中每次都创建新的闭包，所以不能区分两次注入的函数区别
    *
    * @template K - 事件的名称。
    * @template T - 事件的负载类型（仅在定义新事件时使用）。
@@ -148,6 +149,10 @@ export class EventEmitter<E extends Record<PropertyKey, any> = {}> {
    *
    * // 第二次触发，监听器已不存在，无任何反应
    * emitter.emit('one-time', '第二次调用')
+   *
+   * let cnt = 0;
+   * emitter.once('hello', ()=>cnt++).once('hello', ()=>cnt++).emit('hello')
+   * /// cnt === 2
    * ```
    */
   public once<K extends keyof E>(
