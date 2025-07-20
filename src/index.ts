@@ -163,6 +163,7 @@ export class EventEmitter<E extends Record<PropertyKey, any> = {}> {
     const listenerList = this.map.get(key)
     if (listenerList === undefined) return this
 
+    /// 当 indexOf 不存在时返回 -1， -1 >>> 0 === 4294967295 不会删除任何元素
     listenerList.splice(listenerList.indexOf(listener) >>> 0, 1)
     if (listenerList.length === 0) this.map.delete(key)
 
