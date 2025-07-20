@@ -1,0 +1,59 @@
+name: Bundle Size Badge
+
+on:
+  push:
+    branches:
+      - main
+permissions:
+  contents: write
+
+jobs:
+  bundle-size:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Cache Bun dependencies
+        uses: actions/cache@v4
+        with:
+          path: ~/.bun/install/cache
+          key: ${{ runner.os }}-bun-${{ hashFiles('bun.lockb') }}
+          restore-keys: |
+            ${{ runner.os }}-bun-
+
+      - name: Install dependencies with Bun
+        run: bun install
+
+      - name: Build project minify
+        run: bun run build --minify
+
+      - name: Calculate sizes with size-limit
+        run: bunx size-limit --json > size.json
+
+      - name: Generate SVG Badges
+        run: |
+          MIN_SIZE=$(jq '.[0].size' size.json)
+          GZIP_SIZE=$(jq '.[1].size' size.json)
+          MINIFY_KB=$(awk "BEGIN {printf \"%.1f\", $MIN_SIZE/1024}")
+          GZIP_KB=$(awk "BEGIN {printf \"%.1f\", $GZIP_SIZE/1024}")
+
+          mkdir -p badges
+
+          curl -s "https://img.shields.io/static/v1?label=minify&message=${MINIFY_KB}kB&labelColor=007ec6&color=555" -o badges/minify.svg
+          curl -s "https://img.shields.io/static/v1?label=gzip&message=${GZIP_KB}kB&labelColor=4c1&color=555" -o badges/gzip.svg
+
+      - name: Deploy badge to GitHub Pages
+        uses: peaceiris/actions-gh-pages@v3
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./badges
+          publish_branch: gh-pages
+          destination_dir: .
+          force_orphan: true # 会删除 gh-pages 分支所有内容后重新推送
+          commit_message: 'chore: update bundle size badge'

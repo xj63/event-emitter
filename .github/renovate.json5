@@ -1,0 +1,4 @@
+{
+  extends: ['github>xj63/event-emitter'],
+  automerge: true,
+}

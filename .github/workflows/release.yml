@@ -1,0 +1,44 @@
+name: Release
+
+permissions:
+  contents: write # 生成 GitHub Release 需要
+  packages: write # 发布 GitHub Packages 所需
+  id-token: write # jsr need
+
+on:
+  push:
+    tags:
+      - 'v*' # 监听所有 v 开头的 tag
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # 确保拿到所有 tag
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: bun install
+
+      - name: Build
+        run: bun run build
+
+      - name: Publish to GitHub Packages
+        run: bun publish
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Create GitHub Release with changelog
+        run: bunx changelogithub
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Publish to JSR Package
+        run: bunx jsr publish

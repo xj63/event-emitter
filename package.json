@@ -1,0 +1,72 @@
+{
+  "name": "@xj63/event-emitter",
+  "version": "0.0.0",
+  "packageManager": "bun@1.2.18",
+  "description": "🚀 A fast and lightweight event emitter written in TypeScript, with zero dependencies.",
+  "type": "module",
+  "license": "MIT",
+  "homepage": "https://github.com/xj63/event-emitter",
+  "bugs": {
+    "url": "https://github.com/xj63/event-emitter/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/xj63/event-emitter.git"
+  },
+  "author": "xj63 <xj63work@163.com>",
+  "files": [
+    "dist"
+  ],
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": "./dist/index.js",
+    "./package.json": "./package.json"
+  },
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://npm.pkg.github.com"
+  },
+  "scripts": {
+    "lint": "eslint --cache .",
+    "lint:fix": "bun run lint --fix",
+    "build": "tsdown",
+    "dev": "tsdown --watch",
+    "test": "vitest",
+    "typecheck": "tsc --noEmit",
+    "format": "prettier --cache --write .",
+    "release": "bumpp",
+    "prepublishOnly": "bun run build",
+    "size": "bun run build --minify && size-limit"
+  },
+  "size-limit": [
+    {
+      "name": "min",
+      "path": "dist/index.js",
+      "brotli": false
+    },
+    {
+      "name": "gzip",
+      "path": "dist/index.js",
+      "gzip": true
+    }
+  ],
+  "devDependencies": {
+    "@size-limit/file": "^11.2.0",
+    "@sxzz/eslint-config": "^7.0.6",
+    "@sxzz/prettier-config": "^2.2.3",
+    "@types/node": "^24.0.14",
+    "badgen-cli": "^0.2.0",
+    "bumpp": "^10.2.0",
+    "eslint": "^9.31.0",
+    "happy-dom": "^18.0.1",
+    "prettier": "^3.6.2",
+    "size-limit": "^11.2.0",
+    "tsdown": "^0.12.9",
+    "tsx": "^4.20.3",
+    "typescript": "^5.8.3",
+    "vitest": "^3.2.4"
+  },
+  "prettier": "@sxzz/prettier-config"
+}
